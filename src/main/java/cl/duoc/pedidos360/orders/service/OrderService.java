@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,6 +15,7 @@ import cl.duoc.pedidos360.orders.client.CatalogClient.StockItem;
 import cl.duoc.pedidos360.orders.dto.CreateOrderRequest;
 import cl.duoc.pedidos360.orders.dto.OrderResponse;
 import cl.duoc.pedidos360.orders.dto.RequestUser;
+import cl.duoc.pedidos360.orders.event.OrderChangedEvent;
 import cl.duoc.pedidos360.orders.exception.ApiException;
 import cl.duoc.pedidos360.orders.model.Order;
 import cl.duoc.pedidos360.orders.model.OrderItem;
@@ -25,10 +27,12 @@ public class OrderService {
 
     private final OrderRepository repository;
     private final CatalogClient catalog;
+    private final ApplicationEventPublisher events;
 
-    public OrderService(OrderRepository repository, CatalogClient catalog) {
+    public OrderService(OrderRepository repository, CatalogClient catalog, ApplicationEventPublisher events) {
         this.repository = repository;
         this.catalog = catalog;
+        this.events = events;
     }
 
     @Transactional(readOnly = true)
@@ -55,6 +59,7 @@ public class OrderService {
         order.setCustomerName(request.customerName() != null && !request.customerName().isBlank()
                 ? request.customerName()
                 : user.name());
+        order.setCustomerEmail(user.email());
         order.setStatus(OrderStatus.CREADO);
 
         BigDecimal total = BigDecimal.ZERO;
@@ -69,11 +74,14 @@ public class OrderService {
             total = total.add(item.subtotal());
         }
         order.setTotal(total);
-        return OrderResponse.from(repository.save(order));
+
+        OrderResponse response = OrderResponse.from(repository.save(order));
+        events.publishEvent(new OrderChangedEvent(response, null, user));
+        return response;
     }
 
     @Transactional
-    public OrderResponse changeStatus(Long id, OrderStatus next) {
+    public OrderResponse changeStatus(Long id, OrderStatus next, RequestUser user) {
         Order order = repository.findById(id).orElseThrow(() -> notFound(id));
         OrderStatus current = order.getStatus();
 
@@ -91,7 +99,10 @@ public class OrderService {
             order.setDeliveredAt(Instant.now());
         }
         order.setStatus(next);
-        return OrderResponse.from(repository.save(order));
+
+        OrderResponse response = OrderResponse.from(repository.save(order));
+        events.publishEvent(new OrderChangedEvent(response, current, user));
+        return response;
     }
 
     private static ApiException notFound(Long id) {

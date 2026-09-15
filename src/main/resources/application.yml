@@ -13,6 +13,22 @@ spring:
     hibernate:
       ddl-auto: update
     open-in-view: false
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:pedidos360}
+    password: ${RABBITMQ_PASSWORD:pedidos360}
+
+pedidos360:
+  messaging:
+    # false: funciona sin RabbitMQ ni Kafka (EP1). true: publica eventos en Kafka y comandos en RabbitMQ
+    enabled: ${MESSAGING_ENABLED:false}
 
 services:
   catalog-url: ${CATALOG_URL:http://localhost:8082}
@@ -22,3 +38,6 @@ management:
     web:
       exposure:
         include: health
+  health:
+    rabbit:
+      enabled: ${MESSAGING_ENABLED:false}

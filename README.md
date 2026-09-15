@@ -43,3 +43,9 @@ MySQL (Amazon RDS en AWS, Docker en local). Schema `pedidos360_orders`, tablas `
 ./mvnw test
 ./mvnw spring-boot:run
 ```
+
+## Autores
+
+Germán Maraboli & Camila Vera
+
+Proyecto Pedidos360 · DSY1107 Desarrollo Cloud Native I · Duoc UC
