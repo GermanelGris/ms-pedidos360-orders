@@ -13,7 +13,6 @@ public record OrderResponse(
         Long id,
         String customerId,
         String customerName,
-        String customerEmail,
         OrderStatus status,
         Set<OrderStatus> nextStatuses,
         BigDecimal total,
@@ -33,8 +32,8 @@ public record OrderResponse(
         List<Item> items = order.getItems().stream()
                 .map(i -> new Item(i.getProductId(), i.getProductName(), i.getQuantity(), i.getUnitPrice(), i.subtotal()))
                 .toList();
-        return new OrderResponse(order.getId(), order.getCustomerId(), order.getCustomerName(), order.getCustomerEmail(),
-                order.getStatus(), order.getStatus().nextStatuses(), order.getTotal(), order.getCreatedAt(),
-                order.getUpdatedAt(), order.getDeliveredAt(), leadTime, items);
+        return new OrderResponse(order.getId(), order.getCustomerId(), order.getCustomerName(), order.getStatus(),
+                order.getStatus().nextStatuses(), order.getTotal(), order.getCreatedAt(), order.getUpdatedAt(),
+                order.getDeliveredAt(), leadTime, items);
     }
 }
