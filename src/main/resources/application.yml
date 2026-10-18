@@ -13,6 +13,40 @@ spring:
     hibernate:
       ddl-auto: update
     open-in-view: false
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:pedidos360}
+    password: ${RABBITMQ_PASSWORD:pedidos360}
+    connection-timeout: 3s
+    # Confirmación del broker por cada publicación y devolución de los mensajes sin cola de destino
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
+
+# Única fuente de nombres de RabbitMQ del microservicio: exchanges, colas, DLQ y routing keys.
+# Deben coincidir con los de ms-pedidos360-notify (la declaración en ambos lados es idempotente).
+pedidos360:
+  messaging:
+    # false: el sistema funciona sin RabbitMQ (no se publican comandos)
+    enabled: ${MESSAGING_ENABLED:true}
+  rabbitmq:
+    exchanges:
+      commands: cmd.direct
+      dead-letter: cmd.dead.dlx
+    email:
+      queue: q.cmd.email
+      dlq: q.cmd.email.dlq
+      routing-key: email.send
+    kitchen:
+      queue: q.cmd.kitchen
+      dlq: q.cmd.kitchen.dlq
+      routing-key: kitchen.ticket
+    invoice:
+      queue: q.cmd.invoice
+      dlq: q.cmd.invoice.dlq
+      routing-key: invoice.gen
 
 services:
   catalog-url: ${CATALOG_URL:http://localhost:8082}
@@ -22,3 +56,6 @@ management:
     web:
       exposure:
         include: health
+  health:
+    rabbit:
+      enabled: ${MESSAGING_ENABLED:true}

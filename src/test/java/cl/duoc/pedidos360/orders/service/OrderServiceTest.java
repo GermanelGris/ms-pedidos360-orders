@@ -16,6 +16,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 
 import cl.duoc.pedidos360.orders.client.CatalogClient;
@@ -24,6 +25,7 @@ import cl.duoc.pedidos360.orders.client.CatalogClient.StockItem;
 import cl.duoc.pedidos360.orders.dto.CreateOrderRequest;
 import cl.duoc.pedidos360.orders.dto.OrderResponse;
 import cl.duoc.pedidos360.orders.dto.RequestUser;
+import cl.duoc.pedidos360.orders.event.OrderChangedEvent;
 import cl.duoc.pedidos360.orders.exception.ApiException;
 import cl.duoc.pedidos360.orders.model.Order;
 import cl.duoc.pedidos360.orders.model.OrderItem;
@@ -38,6 +40,9 @@ class OrderServiceTest {
 
     @Mock
     private CatalogClient catalog;
+
+    @Mock
+    private ApplicationEventPublisher events;
 
     @InjectMocks
     private OrderService service;
@@ -56,6 +61,7 @@ class OrderServiceTest {
         assertThat(response.total()).isEqualByComparingTo("17980");
         assertThat(response.customerId()).isEqualTo("cliente-1");
         assertThat(response.customerName()).isEqualTo("Cliente Uno");
+        verify(events).publishEvent(new OrderChangedEvent(response, null));
     }
 
     @Test
@@ -68,6 +74,7 @@ class OrderServiceTest {
 
         assertThat(response.status()).isEqualTo(OrderStatus.ACEPTADO);
         verify(catalog).decreaseStock(List.of(new StockItem(1L, 2)));
+        verify(events).publishEvent(new OrderChangedEvent(response, OrderStatus.CREADO));
     }
 
     @Test
@@ -77,7 +84,7 @@ class OrderServiceTest {
         assertThatThrownBy(() -> service.changeStatus(1L, OrderStatus.DESPACHADO))
                 .isInstanceOf(ApiException.class)
                 .extracting("status").isEqualTo(HttpStatus.CONFLICT);
-        verifyNoInteractions(catalog);
+        verifyNoInteractions(catalog, events);
     }
 
     @Test
