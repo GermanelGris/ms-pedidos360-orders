@@ -48,6 +48,7 @@ class OrderServiceTest {
     private OrderService service;
 
     private final RequestUser cliente = new RequestUser("cliente-1", "Cliente Uno", List.of("Cliente"));
+    private final RequestUser operador = new RequestUser("operador-1", "Operador Uno", List.of("Operador"));
 
     @Test
     void creaPedidoEnEstadoCreadoConTotalCalculado() {
@@ -61,7 +62,7 @@ class OrderServiceTest {
         assertThat(response.total()).isEqualByComparingTo("17980");
         assertThat(response.customerId()).isEqualTo("cliente-1");
         assertThat(response.customerName()).isEqualTo("Cliente Uno");
-        verify(events).publishEvent(new OrderChangedEvent(response, null));
+        verify(events).publishEvent(new OrderChangedEvent(response, null, cliente));
     }
 
     @Test
@@ -70,18 +71,18 @@ class OrderServiceTest {
         given(repository.findById(1L)).willReturn(Optional.of(order));
         given(repository.save(order)).willReturn(order);
 
-        OrderResponse response = service.changeStatus(1L, OrderStatus.ACEPTADO);
+        OrderResponse response = service.changeStatus(1L, OrderStatus.ACEPTADO, operador);
 
         assertThat(response.status()).isEqualTo(OrderStatus.ACEPTADO);
         verify(catalog).decreaseStock(List.of(new StockItem(1L, 2)));
-        verify(events).publishEvent(new OrderChangedEvent(response, OrderStatus.CREADO));
+        verify(events).publishEvent(new OrderChangedEvent(response, OrderStatus.CREADO, operador));
     }
 
     @Test
     void despacharSinAceptarRespondeConflicto() {
         given(repository.findById(1L)).willReturn(Optional.of(pedido("cliente-1", OrderStatus.CREADO)));
 
-        assertThatThrownBy(() -> service.changeStatus(1L, OrderStatus.DESPACHADO))
+        assertThatThrownBy(() -> service.changeStatus(1L, OrderStatus.DESPACHADO, operador))
                 .isInstanceOf(ApiException.class)
                 .extracting("status").isEqualTo(HttpStatus.CONFLICT);
         verifyNoInteractions(catalog, events);

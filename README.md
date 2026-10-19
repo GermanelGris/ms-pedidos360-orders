@@ -42,6 +42,17 @@ Cuando se crea un pedido o cambia de estado, `OrderService` publica un evento de
 - **Sin romper el flujo existente**: si RabbitMQ está caído, el pedido igual se guarda y la API responde normalmente; el error queda en el log. Con `MESSAGING_ENABLED=false` no se publica nada.
 - Envelope común: `type`, `eventId` (también va como `messageId`), `timestamp`, `traceId`, `correlationId` (`order-{id}`) y `payload`.
 
+### Eventos de dominio (publish/subscribe)
+
+Además de los comandos, `messaging/OrderEventPublisher` publica cada cambio **una sola vez** en el exchange topic `orders.events`. El productor no conoce a los suscriptores: cada uno declara y enlaza su propia cola (con su retry y su DLQ).
+
+| Cuándo | Routing key | Tipo | Suscriptores |
+|---|---|---|---|
+| Creación | `order.created` | `OrderCreated` | `q.report.orders` (KPIs), `q.audit.orders` (timeline) |
+| Cambio de estado | `order.status-changed` | `OrderStatusChanged` | `q.report.orders`, `q.audit.orders` |
+
+El evento lleva `eventId`, `occurredAt`, `traceId`, `correlationId`, `source`, el `actor` que hizo el cambio (id, nombre y roles, desde los headers `X-User-*` del BFF), `previousStatus` y la foto completa del pedido. Un evento sin colas enlazadas solo se registra en el log (no se reenvía a la DLQ de comandos).
+
 ## Base de datos
 
 MySQL (Amazon RDS en AWS, Docker en local). Schema `pedidos360_orders`, tablas `orders` y `order_items` creadas por JPA.

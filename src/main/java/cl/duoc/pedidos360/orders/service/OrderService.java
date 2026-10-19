@@ -75,12 +75,12 @@ public class OrderService {
         order.setTotal(total);
 
         OrderResponse response = OrderResponse.from(repository.save(order));
-        events.publishEvent(new OrderChangedEvent(response, null));
+        events.publishEvent(new OrderChangedEvent(response, null, user));
         return response;
     }
 
     @Transactional
-    public OrderResponse changeStatus(Long id, OrderStatus next) {
+    public OrderResponse changeStatus(Long id, OrderStatus next, RequestUser user) {
         Order order = repository.findById(id).orElseThrow(() -> notFound(id));
         OrderStatus current = order.getStatus();
 
@@ -100,7 +100,7 @@ public class OrderService {
         order.setStatus(next);
 
         OrderResponse response = OrderResponse.from(repository.save(order));
-        events.publishEvent(new OrderChangedEvent(response, current));
+        events.publishEvent(new OrderChangedEvent(response, current, user));
         return response;
     }
 

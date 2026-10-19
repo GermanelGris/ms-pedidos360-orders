@@ -47,6 +47,11 @@ pedidos360:
       queue: q.cmd.invoice
       dlq: q.cmd.invoice.dlq
       routing-key: invoice.gen
+    # Eventos de dominio (pub/sub): cada consumidor (report, audit) declara y enlaza su propia cola
+    events:
+      exchange: orders.events       # topic
+      created-key: order.created
+      status-changed-key: order.status-changed
 
 services:
   catalog-url: ${CATALOG_URL:http://localhost:8082}

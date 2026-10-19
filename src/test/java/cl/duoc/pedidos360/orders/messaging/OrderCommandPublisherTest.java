@@ -27,6 +27,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 import cl.duoc.pedidos360.orders.config.RabbitMessagingProperties;
+import cl.duoc.pedidos360.orders.config.RabbitMessagingProperties.Events;
 import cl.duoc.pedidos360.orders.config.RabbitMessagingProperties.Exchanges;
 import cl.duoc.pedidos360.orders.config.RabbitMessagingProperties.Route;
 import cl.duoc.pedidos360.orders.dto.OrderResponse;
@@ -35,17 +36,18 @@ import cl.duoc.pedidos360.orders.model.OrderStatus;
 
 class OrderCommandPublisherTest {
 
-    private static final RabbitMessagingProperties PROPERTIES = new RabbitMessagingProperties(
+    static final RabbitMessagingProperties PROPERTIES = new RabbitMessagingProperties(
             new Exchanges("cmd.direct", "cmd.dead.dlx"),
             new Route("q.email", "q.email.dlq", "email.send"),
             new Route("q.kitchen", "q.kitchen.dlq", "kitchen.ticket"),
-            new Route("q.invoice", "q.invoice.dlq", "invoice.gen"));
+            new Route("q.invoice", "q.invoice.dlq", "invoice.gen"),
+            new Events("orders.events", "order.created", "order.status-changed"));
 
     private final RabbitTemplate rabbit = mock(RabbitTemplate.class);
     private final JsonMapper mapper = JsonMapper.builder().build();
     private final OrderCommandPublisher publisher = new OrderCommandPublisher(rabbit, mapper, PROPERTIES);
 
-    private static OrderResponse order(OrderStatus status) {
+    static OrderResponse order(OrderStatus status) {
         return new OrderResponse(7L, "cliente-1", "Cliente Uno", status, Set.of(), new BigDecimal("17980"),
                 Instant.now(), Instant.now(), null, null,
                 List.of(new OrderResponse.Item(1L, "Pizza", 2, new BigDecimal("8990"), new BigDecimal("17980"))));
@@ -53,7 +55,7 @@ class OrderCommandPublisherTest {
 
     @Test
     void pedidoCreadoSoloNotificaAlCliente() {
-        publisher.onOrderChanged(new OrderChangedEvent(order(OrderStatus.CREADO), null));
+        publisher.onOrderChanged(new OrderChangedEvent(order(OrderStatus.CREADO), null, null));
 
         ArgumentCaptor<Message> message = ArgumentCaptor.forClass(Message.class);
         verify(rabbit).send(eq("cmd.direct"), eq("email.send"), message.capture(), any(CorrelationData.class));
@@ -69,7 +71,7 @@ class OrderCommandPublisherTest {
 
     @Test
     void pedidoAceptadoGeneraTicketDeCocina() {
-        publisher.onOrderChanged(new OrderChangedEvent(order(OrderStatus.ACEPTADO), OrderStatus.CREADO));
+        publisher.onOrderChanged(new OrderChangedEvent(order(OrderStatus.ACEPTADO), OrderStatus.CREADO, null));
 
         verify(rabbit).send(eq("cmd.direct"), eq("email.send"), any(Message.class), any(CorrelationData.class));
         verify(rabbit).send(eq("cmd.direct"), eq("kitchen.ticket"), any(Message.class), any(CorrelationData.class));
@@ -78,7 +80,7 @@ class OrderCommandPublisherTest {
 
     @Test
     void pedidoEntregadoGeneraBoleta() {
-        publisher.onOrderChanged(new OrderChangedEvent(order(OrderStatus.ENTREGADO), OrderStatus.DESPACHADO));
+        publisher.onOrderChanged(new OrderChangedEvent(order(OrderStatus.ENTREGADO), OrderStatus.DESPACHADO, null));
 
         verify(rabbit).send(eq("cmd.direct"), eq("invoice.gen"), any(Message.class), any(CorrelationData.class));
         verify(rabbit, never()).send(anyString(), eq("kitchen.ticket"), any(Message.class), any(CorrelationData.class));
@@ -89,7 +91,7 @@ class OrderCommandPublisherTest {
         doThrow(new AmqpConnectException(new RuntimeException("Connection refused")))
                 .when(rabbit).send(anyString(), anyString(), any(Message.class), any(CorrelationData.class));
 
-        assertThatCode(() -> publisher.onOrderChanged(new OrderChangedEvent(order(OrderStatus.CREADO), null)))
+        assertThatCode(() -> publisher.onOrderChanged(new OrderChangedEvent(order(OrderStatus.CREADO), null, null)))
                 .doesNotThrowAnyException();
     }
 }

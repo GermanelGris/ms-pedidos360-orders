@@ -64,7 +64,10 @@ public class OrderController {
 
     @PatchMapping("/{id}/status")
     @Operation(summary = "Cambiar estado (valida la máquina de estados y descuenta stock al aceptar)")
-    public OrderResponse changeStatus(@PathVariable Long id, @Valid @RequestBody ChangeStatusRequest request) {
-        return service.changeStatus(id, request.status());
+    public OrderResponse changeStatus(@PathVariable Long id, @Valid @RequestBody ChangeStatusRequest request,
+                                      @RequestHeader(value = "X-User-Id", required = false) String userId,
+                                      @RequestHeader(value = "X-User-Name", required = false) String userName,
+                                      @RequestHeader(value = "X-User-Roles", required = false) String roles) {
+        return service.changeStatus(id, request.status(), RequestUser.fromHeaders(userId, userName, roles));
     }
 }

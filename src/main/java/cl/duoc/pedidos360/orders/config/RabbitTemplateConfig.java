@@ -18,7 +18,8 @@ import org.springframework.context.annotation.Configuration;
  * <ul>
  *   <li><b>Confirm:</b> si el broker no confirma (NACK) la publicación, se registra con nivel ERROR.</li>
  *   <li><b>Return:</b> si un comando no tenía cola de destino (por ejemplo, la cola fue eliminada desde el
- *       administrador), se registra y se reenvía al dead-letter exchange para que quede en la DLQ del flujo.</li>
+ *       administrador), se registra y se reenvía al dead-letter exchange para que quede en la DLQ del flujo.
+ *       Un evento de dominio sin suscriptores solo se registra.</li>
  * </ul>
  */
 @Configuration
@@ -32,6 +33,7 @@ public class RabbitTemplateConfig {
 
     @Bean
     RabbitTemplateCustomizer reliablePublishing(RabbitMessagingProperties properties) {
+        String commandsExchange = properties.exchanges().commands();
         String deadLetterExchange = properties.exchanges().deadLetter();
         return template -> {
             template.setConfirmCallback((correlation, ack, cause) -> {
@@ -40,16 +42,21 @@ public class RabbitTemplateConfig {
                             correlation == null ? "-" : correlation.getId(), cause);
                 }
             });
-            template.setReturnsCallback(returned -> onReturned(template, returned, deadLetterExchange));
+            template.setReturnsCallback(returned -> onReturned(template, returned, commandsExchange, deadLetterExchange));
         };
     }
 
-    private void onReturned(RabbitTemplate template, ReturnedMessage returned, String deadLetterExchange) {
+    private void onReturned(RabbitTemplate template, ReturnedMessage returned, String commandsExchange,
+                            String deadLetterExchange) {
+        if (!commandsExchange.equals(returned.getExchange())) {
+            // Eventos de dominio sin suscriptores (o la DLQ tampoco existe): solo se registra
+            log.error("Mensaje no entregado ({} {}): exchange={} routingKey={} no tiene colas enlazadas",
+                    returned.getReplyCode(), returned.getReplyText(), returned.getExchange(),
+                    returned.getRoutingKey());
+            return;
+        }
         log.error("Mensaje no entregado ({} {}): exchange={} routingKey={}. Se envía a la DLQ",
                 returned.getReplyCode(), returned.getReplyText(), returned.getExchange(), returned.getRoutingKey());
-        if (deadLetterExchange.equals(returned.getExchange())) {
-            return; // tampoco existe la DLQ: no se reintenta para evitar un ciclo
-        }
         deadLetterForwarder.execute(() -> {
             try {
                 template.send(deadLetterExchange, returned.getRoutingKey(), returned.getMessage());

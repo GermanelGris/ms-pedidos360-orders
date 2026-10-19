@@ -6,6 +6,7 @@ import org.springframework.amqp.core.DirectExchange;
 import org.springframework.amqp.core.ExchangeBuilder;
 import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.core.QueueBuilder;
+import org.springframework.amqp.core.TopicExchange;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -21,6 +22,9 @@ import org.springframework.context.annotation.Configuration;
  * Ticket de cocina   kitchen.ticket   q.cmd.kitchen    q.cmd.kitchen.dlq   al pasar a ACEPTADO
  * Boleta             invoice.gen      q.cmd.invoice    q.cmd.invoice.dlq   al pasar a ENTREGADO
  * </pre>
+ *
+ * Además declara el exchange topic de eventos de dominio ({@code orders.events}). Sus colas las declaran los
+ * suscriptores (ms-pedidos360-report, ms-pedidos360-audit): el productor no conoce a quién le interesa el evento.
  */
 @Configuration
 @ConditionalOnProperty(name = "pedidos360.messaging.enabled", havingValue = "true", matchIfMissing = true)
@@ -42,6 +46,11 @@ public class RabbitTopologyConfig {
     @Bean
     DirectExchange deadLetterExchange() {
         return ExchangeBuilder.directExchange(properties.exchanges().deadLetter()).durable(true).build();
+    }
+
+    @Bean
+    TopicExchange orderEventsExchange() {
+        return ExchangeBuilder.topicExchange(properties.events().exchange()).durable(true).build();
     }
 
     // ---- Caso de uso: notificar al cliente ----
